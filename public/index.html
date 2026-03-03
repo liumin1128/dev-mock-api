@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dev Mock API - 代理管理面板</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6;
+    --green: #22c55e; --orange: #f59e0b; --red: #ef4444; --pin: #eab308;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace; background: var(--bg); color: var(--text); font-size: 13px; }
+
+  /* 顶栏 */
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+  .topbar h1 { font-size: 16px; font-weight: 600; }
+  .topbar .actions { display: flex; gap: 8px; }
+
+  /* 标签 */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 49px; z-index: 99; }
+  .tab { padding: 10px 24px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: .2s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-color: var(--accent); }
+
+  /* 按钮 */
+  .btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; font-size: 12px; transition: .15s; }
+  .btn:hover { background: var(--border); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { opacity: .85; }
+  .btn-danger { color: var(--red); border-color: var(--red); }
+  .btn-danger:hover { background: var(--red); color: #fff; }
+  .btn-pin { color: var(--pin); border-color: var(--pin); }
+  .btn-pin:hover { background: var(--pin); color: #000; }
+  .btn-pin.pinned { background: var(--pin); color: #000; }
+  .btn-sm { padding: 3px 8px; font-size: 11px; }
+
+  /* 主面板 */
+  .panel { display: none; padding: 0; }
+  .panel.active { display: block; }
+
+  /* 记录列表 */
+  .record-list { }
+  .record-item { display: grid; grid-template-columns: 70px 1fr 80px 100px 160px; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border); cursor: pointer; transition: .1s; }
+  .record-item .url-host { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record-item:hover { background: rgba(59,130,246,.06); }
+  .record-item.selected { background: rgba(59,130,246,.12); }
+  .record-item.mocked { border-left: 3px solid var(--pin); }
+
+  .method { font-weight: 700; font-size: 11px; text-transform: uppercase; }
+  .method.GET { color: var(--green); }
+  .method.POST { color: var(--accent); }
+  .method.PUT { color: var(--orange); }
+  .method.DELETE { color: var(--red); }
+  .method.PATCH { color: #a78bfa; }
+
+  .url-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .status-code { text-align: center; font-weight: 600; }
+  .status-code.s2xx { color: var(--green); }
+  .status-code.s3xx { color: var(--orange); }
+  .status-code.s4xx { color: var(--red); }
+  .status-code.s5xx { color: var(--red); }
+  .record-time { color: var(--muted); font-size: 11px; text-align: right; }
+  .record-source { font-size: 10px; padding: 2px 6px; border-radius: 3px; text-align: center; }
+  .record-source.proxy { background: rgba(59,130,246,.15); color: var(--accent); }
+  .record-source.mock { background: rgba(234,179,8,.15); color: var(--pin); }
+
+  /* 详情面板 */
+  .detail-pane { position: fixed; right: 0; top: 0; bottom: 0; width: 50vw; max-width: 700px; background: var(--surface); border-left: 1px solid var(--border); transform: translateX(100%); transition: transform .25s ease; z-index: 200; display: flex; flex-direction: column; }
+  .detail-pane.open { transform: translateX(0); }
+  .detail-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .detail-header h3 { font-size: 14px; }
+  .detail-body { overflow-y: auto; flex: 1; padding: 16px 20px; }
+  .detail-section { margin-bottom: 20px; }
+  .detail-section h4 { color: var(--muted); font-size: 11px; text-transform: uppercase; margin-bottom: 8px; letter-spacing: .5px; }
+  .detail-section pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; font-size: 12px; line-height: 1.5; }
+  .detail-actions { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* Mock列表 */
+  .mock-item { display: grid; grid-template-columns: 70px 1fr 160px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+  .mock-item .actions { display: flex; gap: 6px; }
+  .mock-badge { font-size: 10px; padding: 2px 8px; border-radius: 3px; margin-left: 8px; }
+  .mock-badge.pin { background: rgba(234,179,8,.15); color: var(--pin); }
+  .mock-badge.custom { background: rgba(168,139,250,.15); color: #a78bfa; }
+
+  /* 编辑弹窗 */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; z-index: 300; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 24px; width: 600px; max-height: 80vh; display: flex; flex-direction: column; }
+  .modal h3 { margin-bottom: 16px; }
+  .modal textarea { width: 100%; min-height: 300px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: inherit; font-size: 12px; resize: vertical; outline: none; }
+  .modal textarea:focus { border-color: var(--accent); }
+  .modal .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+  .modal .form-row { margin-bottom: 12px; }
+  .modal label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; text-transform: uppercase; }
+  .modal input, .modal select { width: 100%; padding: 8px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 12px; outline: none; }
+  .modal input:focus, .modal select:focus { border-color: var(--accent); }
+
+  .empty-state { display: flex; align-items: center; justify-content: center; padding: 80px 20px; color: var(--muted); font-size: 14px; }
+
+  /* 搜索框 */
+  .search-box { padding: 10px 20px; border-bottom: 1px solid var(--border); }
+  .search-box input { width: 100%; padding: 8px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 12px; outline: none; }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box input::placeholder { color: var(--muted); }
+
+  /* 自动刷新标志 */
+  .auto-refresh { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+  .auto-refresh .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📡 Dev Mock API</h1>
+  <div class="actions">
+    <div class="auto-refresh"><span class="dot"></span> 自动刷新</div>
+    <a class="btn" href="/__mock-admin/ca.crt" download>🔐 CA证书</a>
+    <button class="btn" onclick="loadRecords()">刷新</button>
+    <button class="btn btn-danger" onclick="clearRecords()">清空记录</button>
+    <button class="btn btn-primary" onclick="openAddMockModal()">+ 新增 Mock</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="records">📋 请求记录</div>
+  <div class="tab" data-tab="mocks">📌 Mock 规则</div>
+</div>
+
+<div id="panel-records" class="panel active">
+  <div class="search-box">
+    <input type="text" id="search-input" placeholder="搜索 URL 路径..." oninput="renderRecords()">
+  </div>
+  <div id="record-list" class="record-list"></div>
+</div>
+
+<div id="panel-mocks" class="panel">
+  <div id="mock-list"></div>
+</div>
+
+<!-- 详情侧边栏 -->
+<div class="detail-pane" id="detail-pane">
+  <div class="detail-header">
+    <h3 id="detail-title">请求详情</h3>
+    <button class="btn btn-sm" onclick="closeDetail()">✕ 关闭</button>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+  <div class="detail-actions" id="detail-actions"></div>
+</div>
+
+<!-- 编辑/新增 Mock 弹窗 -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h3 id="modal-title">编辑 Mock 响应</h3>
+    <div class="form-row" id="modal-method-row">
+      <label>Method</label>
+      <select id="modal-method">
+        <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option><option>PATCH</option>
+      </select>
+    </div>
+    <div class="form-row" id="modal-url-row">
+      <label>URL Path</label>
+      <input type="text" id="modal-url" placeholder="/api/example">
+    </div>
+    <div class="form-row">
+      <label>Response Body (JSON)</label>
+      <textarea id="modal-response"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveMock()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = '/__mock-admin/api';
+let records = [];
+let mocks = {};
+let selectedRecord = null;
+
+// ---- Tab 切换 ----
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'mocks') loadMocks();
+  });
+});
+
+// ---- 数据加载 ----
+async function loadRecords() {
+  const res = await fetch(API_BASE + '/records');
+  records = await res.json();
+  renderRecords();
+}
+
+async function loadMocks() {
+  const res = await fetch(API_BASE + '/mocks');
+  mocks = await res.json();
+  renderMocks();
+}
+
+async function clearRecords() {
+  if (!confirm('确定清空所有记录？')) return;
+  await fetch(API_BASE + '/records', { method: 'DELETE' });
+  loadRecords();
+  closeDetail();
+}
+
+// ---- 渲染记录列表 ----
+function renderRecords() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const filtered = search ? records.filter(r => r.urlPath.toLowerCase().includes(search) || (r.targetHost && r.targetHost.toLowerCase().includes(search))) : records;
+  const container = document.getElementById('record-list');
+
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state">暂无请求记录，开始使用代理后这里会显示</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map((r, i) => {
+    const sc = r.statusCode || '-';
+    const scClass = sc >= 200 && sc < 300 ? 's2xx' : sc >= 300 && sc < 400 ? 's3xx' : sc >= 400 && sc < 500 ? 's4xx' : 's5xx';
+    const isMocked = r.source === 'mock';
+    const hostLabel = r.targetHost ? `<span class="url-host">${esc(r.targetHost)}</span>` : '';
+    return `<div class="record-item ${isMocked ? 'mocked' : ''}" onclick="showDetail(${i})">
+      <span class="method ${r.method}">${r.method}</span>
+      <span class="url-path" title="${esc(r.targetHost || '')}${esc(r.urlPath)}">${hostLabel}${esc(r.urlPath)}</span>
+      <span class="status-code ${scClass}">${sc}</span>
+      <span class="record-source ${r.source}">${r.source === 'mock' ? '📌 Mock' : '↗️ Proxy'}</span>
+      <span class="record-time">${formatTime(r.timestamp)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ---- 渲染Mock规则列表 ----
+function renderMocks() {
+  const container = document.getElementById('mock-list');
+  const entries = Object.entries(mocks);
+
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty-state">暂无 Mock 规则，可以 Pin 住请求记录或手动添加</div>';
+    return;
+  }
+
+  container.innerHTML = entries.map(([key, m]) => {
+    const badge = m.pinned ? '<span class="mock-badge pin">📌 Pinned</span>' : '<span class="mock-badge custom">✏️ Custom</span>';
+    return `<div class="mock-item">
+      <span class="method ${m.method}">${m.method}</span>
+      <span class="url-path">${esc(m.urlPath)} ${badge}</span>
+      <div class="actions">
+        <button class="btn btn-sm" onclick="editMock('${esc(m.method)}','${esc(m.urlPath)}')">编辑</button>
+        <button class="btn btn-sm btn-danger" onclick="removeMock('${esc(m.method)}','${esc(m.urlPath)}')">删除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- 请求详情面板 ----
+function showDetail(idx) {
+  const r = records[idx];
+  if (!r) return;
+  selectedRecord = r;
+  const pane = document.getElementById('detail-pane');
+  document.getElementById('detail-title').textContent = `${r.method} ${r.urlPath}`;
+
+  const mockKey = `${r.method} ${r.urlPath}`;
+  const hasMock = mocks[mockKey];
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-section">
+      <h4>基本信息</h4>
+      <pre>Method:  ${r.method}
+Host:    ${esc(r.targetHost || '-')}
+URL:     ${esc(r.urlPath)}
+Status:  ${r.statusCode || '-'}
+来源:    ${r.source === 'mock' ? '📌 Mock' : '↗️ Proxy'}
+时间:    ${formatTime(r.timestamp)}</pre>
+    </div>
+    <div class="detail-section">
+      <h4>Request Headers</h4>
+      <pre>${esc(prettyJSON(r.requestHeaders))}</pre>
+    </div>
+    ${r.requestBody ? `<div class="detail-section">
+      <h4>Request Body</h4>
+      <pre>${esc(prettyJSON(r.requestBody))}</pre>
+    </div>` : ''}
+    <div class="detail-section">
+      <h4>Response Headers</h4>
+      <pre>${esc(prettyJSON(r.responseHeaders))}</pre>
+    </div>
+    <div class="detail-section">
+      <h4>Response Body</h4>
+      <pre>${esc(prettyJSON(r.responseBody))}</pre>
+    </div>
+  `;
+
+  document.getElementById('detail-actions').innerHTML = `
+    <button class="btn btn-pin ${hasMock ? 'pinned' : ''}" onclick="${hasMock ? `removeMockFromDetail()` : `pinFromDetail()`}">
+      ${hasMock ? '📌 取消 Pin' : '📌 Pin 住此响应'}
+    </button>
+    <button class="btn" onclick="editFromDetail()">✏️ 编辑响应</button>
+  `;
+
+  pane.classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail-pane').classList.remove('open');
+  selectedRecord = null;
+}
+
+async function pinFromDetail() {
+  if (!selectedRecord) return;
+  const r = selectedRecord;
+  const respData = {
+    statusCode: r.statusCode,
+    headers: r.responseHeaders,
+    body: r.responseBody,
+  };
+  await fetch(API_BASE + '/mocks/pin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method: r.method, urlPath: r.urlPath, response: respData }),
+  });
+  await loadMocks();
+  showDetail(records.indexOf(selectedRecord));
+}
+
+async function removeMockFromDetail() {
+  if (!selectedRecord) return;
+  await fetch(API_BASE + '/mocks', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method: selectedRecord.method, urlPath: selectedRecord.urlPath }),
+  });
+  await loadMocks();
+  showDetail(records.indexOf(selectedRecord));
+}
+
+function editFromDetail() {
+  if (!selectedRecord) return;
+  const r = selectedRecord;
+  openEditModal(r.method, r.urlPath, {
+    statusCode: r.statusCode,
+    headers: r.responseHeaders,
+    body: r.responseBody,
+  });
+}
+
+// ---- Mock 编辑/新增 ----
+let modalMode = 'add'; // 'add' | 'edit'
+let editingKey = null;
+
+function openAddMockModal() {
+  modalMode = 'add';
+  editingKey = null;
+  document.getElementById('modal-title').textContent = '新增 Mock 规则';
+  document.getElementById('modal-method').value = 'GET';
+  document.getElementById('modal-url').value = '';
+  document.getElementById('modal-response').value = JSON.stringify({ code: 0, data: {}, message: 'ok' }, null, 2);
+  document.getElementById('modal-method-row').style.display = '';
+  document.getElementById('modal-url-row').style.display = '';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function openEditModal(method, urlPath, response) {
+  modalMode = 'edit';
+  editingKey = { method, urlPath };
+  document.getElementById('modal-title').textContent = `编辑 Mock: ${method} ${urlPath}`;
+  document.getElementById('modal-method').value = method;
+  document.getElementById('modal-url').value = urlPath;
+  document.getElementById('modal-response').value = typeof response === 'string' ? response : JSON.stringify(response, null, 2);
+  document.getElementById('modal-method-row').style.display = 'none';
+  document.getElementById('modal-url-row').style.display = 'none';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function editMock(method, urlPath) {
+  const key = `${method} ${urlPath}`;
+  const m = mocks[key];
+  if (m) openEditModal(method, urlPath, m.response);
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+async function saveMock() {
+  const method = editingKey ? editingKey.method : document.getElementById('modal-method').value;
+  const urlPath = editingKey ? editingKey.urlPath : document.getElementById('modal-url').value.trim();
+  const responseText = document.getElementById('modal-response').value;
+
+  if (!urlPath) return alert('请输入 URL Path');
+
+  let response;
+  try {
+    response = JSON.parse(responseText);
+  } catch {
+    response = responseText; // 允许非JSON
+  }
+
+  await fetch(API_BASE + '/mocks/set', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, urlPath, response }),
+  });
+
+  closeModal();
+  await loadMocks();
+}
+
+async function removeMock(method, urlPath) {
+  if (!confirm(`确定删除 Mock 规则: ${method} ${urlPath} ?`)) return;
+  await fetch(API_BASE + '/mocks', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, urlPath }),
+  });
+  loadMocks();
+}
+
+// ---- 工具函数 ----
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function prettyJSON(obj) {
+  if (obj === null || obj === undefined) return '';
+  if (typeof obj === 'string') {
+    try { return JSON.stringify(JSON.parse(obj), null, 2); } catch { return obj; }
+  }
+  return JSON.stringify(obj, null, 2);
+}
+
+function formatTime(ts) {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  return d.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
+// ---- 自动刷新 ----
+setInterval(async () => {
+  await loadRecords();
+  // 同步mocks到缓存（用于判断pin状态）
+  const res = await fetch(API_BASE + '/mocks');
+  mocks = await res.json();
+}, 2000);
+
+// 初始加载
+loadRecords();
+loadMocks();
+</script>
+</body>
+</html>

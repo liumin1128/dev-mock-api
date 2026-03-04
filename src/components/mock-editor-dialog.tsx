@@ -83,7 +83,7 @@ export function MockEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="p-6 sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {isEdit

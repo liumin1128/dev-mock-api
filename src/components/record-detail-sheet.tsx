@@ -56,14 +56,14 @@ export function RecordDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col sm:max-w-xl">
-        <SheetHeader className="gap-2">
+        <SheetHeader className="gap-2 px-6">
           <SheetTitle className="flex items-center gap-2 text-sm">
             <MethodBadge method={record.method} />
             <span className="truncate font-mono text-xs">{record.urlPath}</span>
           </SheetTitle>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 px-6">
           <div className="space-y-5 pb-4">
             {/* 基本信息 */}
             <DetailSection title="基本信息">
@@ -113,7 +113,7 @@ export function RecordDetailSheet({
         </ScrollArea>
 
         {/* 底部操作 */}
-        <div className="flex gap-2 border-t pt-4">
+        <div className="flex gap-2 border-t px-6 py-4">
           {hasMock ? (
             <Button
               variant="outline"

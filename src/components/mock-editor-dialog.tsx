@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import CodeMirror from '@uiw/react-codemirror'
+import { json } from '@codemirror/lang-json'
 import {
   Dialog,
   DialogContent,
@@ -16,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 
 export interface MockEditorData {
   mode: 'add' | 'edit'
@@ -97,7 +98,7 @@ export function MockEditorDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="min-w-0 space-y-4 py-2">
           {/* Method & URL (仅新增模式可编辑) */}
           {!isEdit && (
             <div className="grid grid-cols-[6.25rem_1fr] gap-3">
@@ -131,15 +132,32 @@ export function MockEditorDialog({
           {/* Response Body */}
           <div className="space-y-1.5">
             <Label className="text-xs">Response Body (JSON)</Label>
-            <Textarea
-              value={response}
-              onChange={(e) => {
-                setResponse(e.target.value)
-                setJsonError(null)
-              }}
-              className="min-h-70 font-mono text-xs leading-relaxed"
-              placeholder='{"code": 0, "data": {}, "message": "ok"}'
-            />
+            <div className="min-w-0 overflow-hidden rounded-md border">
+              <CodeMirror
+                value={response}
+                onChange={(val) => {
+                  setResponse(val)
+                  setJsonError(null)
+                }}
+                extensions={[json()]}
+                theme={
+                  typeof document !== 'undefined' &&
+                  document.documentElement.classList.contains('dark')
+                    ? 'dark'
+                    : 'light'
+                }
+                height="280px"
+                width="100%"
+                basicSetup={{
+                  lineNumbers: true,
+                  foldGutter: true,
+                  bracketMatching: true,
+                  closeBrackets: true,
+                  indentOnInput: true,
+                }}
+                className="text-sm [&_.cm-editor]:!outline-none [&_.cm-scroller]:overflow-auto"
+              />
+            </div>
             {jsonError && (
               <p className="text-xs text-destructive">{jsonError}</p>
             )}

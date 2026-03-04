@@ -18,13 +18,13 @@ function formatTime(ts: string) {
 
 interface RecordListProps {
   records: ProxyRecord[]
-  selectedIndex: number | null
-  onSelect: (index: number) => void
+  selectedTimestamp: string | null
+  onSelect: (record: ProxyRecord) => void
 }
 
 export function RecordList({
   records,
-  selectedIndex,
+  selectedTimestamp,
   onSelect,
 }: RecordListProps) {
   const [search, setSearch] = useState('')
@@ -63,17 +63,14 @@ export function RecordList({
             description="开始使用代理后，所有经过的请求都会显示在这里"
           />
         ) : (
-          filtered.map((record, i) => {
-            const realIndex = records.indexOf(record)
-            return (
-              <RecordRow
-                key={`${record.timestamp}-${i}`}
-                record={record}
-                isSelected={selectedIndex === realIndex}
-                onClick={() => onSelect(realIndex)}
-              />
-            )
-          })
+          filtered.map((record, i) => (
+            <RecordRow
+              key={`${record.timestamp}-${i}`}
+              record={record}
+              isSelected={selectedTimestamp === record.timestamp}
+              onClick={() => onSelect(record)}
+            />
+          ))
         )}
       </div>
     </div>

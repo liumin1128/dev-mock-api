@@ -32,20 +32,18 @@ function App() {
   const { records, refresh: refreshRecords } = useRecords()
   const { mocks, refresh: refreshMocks } = useMocks()
 
-  // 详情面板
-  const [detailIndex, setDetailIndex] = useState<number | null>(null)
+  // 详情面板（快照：打开时冻结记录，不随轮询变化）
+  const [selectedRecord, setSelectedRecord] = useState<ProxyRecord | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
   // Mock 编辑器
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorData, setEditorData] = useState<MockEditorData | null>(null)
 
-  const selectedRecord = detailIndex !== null ? records[detailIndex] : null
-
   // ---- 事件处理 ----
 
-  const handleSelectRecord = useCallback((index: number) => {
-    setDetailIndex(index)
+  const handleSelectRecord = useCallback((record: ProxyRecord) => {
+    setSelectedRecord(record)
     setDetailOpen(true)
   }, [])
 
@@ -233,7 +231,7 @@ function App() {
         >
           <RecordList
             records={records}
-            selectedIndex={detailIndex}
+            selectedTimestamp={selectedRecord?.timestamp ?? null}
             onSelect={handleSelectRecord}
           />
         </TabsContent>

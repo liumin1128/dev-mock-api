@@ -29,7 +29,7 @@ export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
       {entries.map(([key, rule]) => (
         <div
           key={key}
-          className="grid grid-cols-[64px_1fr_100px_auto] items-center gap-3 border-b px-4 py-3"
+          className="grid grid-cols-[4rem_1fr_6.25rem_auto] items-center gap-3 border-b px-4 py-3"
         >
           <MethodBadge method={rule.method} />
           <div className="flex min-w-0 items-center gap-2">
@@ -39,20 +39,20 @@ export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
             {rule.pinned ? (
               <Badge
                 variant="outline"
-                className="shrink-0 border-yellow-500/30 bg-yellow-500/10 text-[10px] text-yellow-600 dark:text-yellow-400"
+                className="shrink-0 border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-600 dark:text-yellow-400"
               >
                 📌 Pinned
               </Badge>
             ) : (
               <Badge
                 variant="outline"
-                className="shrink-0 border-violet-500/30 bg-violet-500/10 text-[10px] text-violet-600 dark:text-violet-400"
+                className="shrink-0 border-violet-500/30 bg-violet-500/10 text-xs text-violet-600 dark:text-violet-400"
               >
                 ✏️ Custom
               </Badge>
             )}
           </div>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {new Date(rule.updatedAt).toLocaleString('zh-CN', {
               hour12: false,
               month: '2-digit',

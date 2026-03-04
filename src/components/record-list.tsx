@@ -90,7 +90,7 @@ function RecordRow({
     <div
       onClick={onClick}
       className={cn(
-        'grid cursor-pointer grid-cols-[64px_1fr_56px_80px_96px] items-center gap-2 border-b px-4 py-2.5 transition-colors hover:bg-accent/50',
+        'grid cursor-pointer grid-cols-[4rem_1fr_3.5rem_5rem_6rem] items-center gap-2 border-b px-4 py-2.5 transition-colors hover:bg-accent/50',
         isSelected && 'bg-accent',
         record.source === 'mock' && 'border-l-2 border-l-yellow-500',
       )}
@@ -101,14 +101,14 @@ function RecordRow({
           {record.urlPath}
         </div>
         {record.targetHost && (
-          <div className="truncate text-[10px] text-muted-foreground">
+          <div className="truncate text-xs text-muted-foreground">
             {record.targetHost}
           </div>
         )}
       </div>
       <StatusBadge code={record.statusCode} />
       <SourceBadge source={record.source} />
-      <span className="text-right text-[11px] text-muted-foreground">
+      <span className="text-right text-xs text-muted-foreground">
         {formatTime(record.timestamp)}
       </span>
     </div>

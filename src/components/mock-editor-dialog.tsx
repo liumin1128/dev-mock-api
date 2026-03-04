@@ -95,7 +95,7 @@ export function MockEditorDialog({
         <div className="space-y-4 py-2">
           {/* Method & URL (仅新增模式可编辑) */}
           {!isEdit && (
-            <div className="grid grid-cols-[100px_1fr] gap-3">
+            <div className="grid grid-cols-[6.25rem_1fr] gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Method</Label>
                 <Select value={method} onValueChange={setMethod}>

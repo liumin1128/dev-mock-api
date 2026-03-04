@@ -151,7 +151,7 @@ function App() {
           <h1 className="text-base font-semibold tracking-tight">
             Dev Mock API
           </h1>
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
             自动刷新
           </div>
@@ -183,7 +183,7 @@ function App() {
             >
               📋 请求记录
               {records.length > 0 && (
-                <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
                   {records.length}
                 </span>
               )}
@@ -194,7 +194,7 @@ function App() {
             >
               📌 Mock 规则
               {Object.keys(mocks).length > 0 && (
-                <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
                   {Object.keys(mocks).length}
                 </span>
               )}

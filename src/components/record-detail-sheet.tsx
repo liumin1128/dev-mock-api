@@ -154,7 +154,7 @@ function DetailSection({
 }) {
   return (
     <div className="space-y-2">
-      <h4 className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+      <h4 className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
         {title}
       </h4>
       {children}
@@ -175,9 +175,7 @@ function InfoItem({
 }) {
   return (
     <div className={className}>
-      <span className="text-[10px] text-muted-foreground uppercase">
-        {label}
-      </span>
+      <span className="text-xs text-muted-foreground uppercase">{label}</span>
       <div className="mt-0.5 font-mono">{children || value}</div>
     </div>
   )
@@ -185,7 +183,7 @@ function InfoItem({
 
 function CodeBlock({ content }: { content: string }) {
   return (
-    <pre className="max-h-64 overflow-auto rounded-md border bg-muted/50 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all">
+    <pre className="max-h-64 overflow-auto rounded-md border bg-muted/50 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-all">
       {content || '(empty)'}
     </pre>
   )

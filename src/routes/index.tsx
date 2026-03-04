@@ -25,6 +25,7 @@ import {
 } from '@/lib/api'
 
 import { Radio, ShieldCheck, Plus, Trash2, RefreshCw } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export const Route = createFileRoute('/')({ component: App })
 
@@ -157,6 +158,7 @@ function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="outline" size="sm" asChild>
             <a href={getCACertUrl()} download>
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />

@@ -83,9 +83,14 @@ export function MockEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-6 sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader className="min-w-0">
+          <DialogTitle
+            className="truncate"
+            title={
+              isEdit ? `编辑 Mock: ${data?.method} ${data?.urlPath}` : undefined
+            }
+          >
             {isEdit
               ? `编辑 Mock: ${data?.method} ${data?.urlPath}`
               : '新增 Mock 规则'}

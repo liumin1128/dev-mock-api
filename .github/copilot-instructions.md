@@ -140,11 +140,51 @@ pnpm run format   # 仅格式化
 ## 开发命令
 
 ```bash
-pnpm run dev      # 启动开发服务器 (端口 3000)
-pnpm run build    # 生产构建
-pnpm run preview  # 预览生产构建
-pnpm run test     # 运行测试
+pnpm run dev        # 启动 UI 开发服务器 (端口 3000)
+pnpm run proxy      # 启动代理服务器 (端口 4523)
+pnpm run proxy:dev  # 启动代理服务器（自动重启模式）
+pnpm run build      # 生产构建
+pnpm run preview    # 预览生产构建
+pnpm run test       # 运行测试
 ```
+
+### 开发模式双进程
+
+开发时需同时运行两个进程：
+
+1. `pnpm proxy:dev` — 启动代理服务器（端口 4523），处理 HTTP/HTTPS 代理和 Mock
+2. `pnpm dev` — 启动 Vite 开发服务器（端口 3000），管理面板 UI
+
+### 微信开发者工具配置
+
+1. 启动代理服务器：`pnpm proxy`
+2. 微信开发者工具 → 设置 → 代理设置 → 手动设置代理
+3. 代理地址 `127.0.0.1`，端口 `4523`
+
+---
+
+## 项目架构
+
+### 双进程架构
+
+```
+┌─────────────────────────┐     ┌───────────────────────────┐
+│   TanStack Start (3000) │────►│  Proxy Server (4523)      │
+│   管理面板 UI            │ API │  HTTP/HTTPS 代理 + Mock   │
+│   shadcn/ui + Router    │     │  Express + MITM           │
+└─────────────────────────┘     └───────────────────────────┘
+```
+
+- **server/** — 代理服务器（独立 Node.js 进程，tsx 运行）
+  - `index.ts` — 入口，HTTP 代理 + HTTPS MITM + Mock 逻辑
+  - `mock-store.ts` — Mock 数据管理（持久化到 mock-data.json）
+  - `cert-manager.ts` — CA 证书和域名证书管理
+  - `api-routes.ts` — 管理 API 端点（带 CORS）
+- **src/** — 管理面板 UI（TanStack Start）
+  - `lib/api.ts` — API 客户端（自动适配开发/生产环境）
+  - `hooks/use-proxy-data.ts` — 数据轮询 hooks
+  - `components/` — UI 组件（badges, record-list, mock-editor 等）
+  - `routes/index.tsx` — 主页面（Tabs: 请求记录 / Mock 规则）
 
 ---
 

@@ -1,0 +1,163 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: macos-latest
+            platform: macos
+            arch: arm64
+          - os: windows-latest
+            platform: win
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Step 1: vite build (生成 .output/)
+      - run: pnpm build
+
+      # Step 2-4: 准备 dist + esbuild 打包
+      - name: Prepare dist & esbuild bundle
+        shell: bash
+        run: |
+          rm -rf dist && mkdir -p dist
+
+          # 复制静态资源
+          cp -r .output/public dist/public
+
+          # esbuild 打包
+          npx esbuild scripts/standalone-entry.ts \
+            --bundle \
+            --platform=node \
+            --format=cjs \
+            --target=node20 \
+            --outfile=dist/standalone.cjs
+
+          # 修复 import.meta polyfill
+          node -e "
+            const fs = require('fs');
+            const f = 'dist/standalone.cjs';
+            let code = fs.readFileSync(f, 'utf-8');
+            code = code.replace(
+              /var (import_meta\d*)\s*=\s*\{\s*\}/g,
+              'var \$1 = { url: require(\"url\").pathToFileURL(__filename).href }'
+            );
+            fs.writeFileSync(f, code, 'utf-8');
+          "
+
+          # 生成 index.html (启动 Nitro SSR 预渲染)
+          node -e "
+            const { spawn } = require('child_process');
+            const path = require('path');
+            const fs = require('fs');
+
+            const entry = path.join('.output', 'server', 'index.mjs');
+            const port = 13579;
+
+            const proc = spawn('node', [entry], {
+              env: { ...process.env, PORT: String(port) },
+              stdio: ['ignore', 'pipe', 'pipe'],
+            });
+
+            async function main() {
+              // 等待服务器就绪
+              for (let i = 0; i < 30; i++) {
+                try {
+                  const res = await fetch('http://localhost:' + port + '/');
+                  if (res.ok) {
+                    let html = await res.text();
+                    html = html.replace(/http:\/\/localhost:\d+/g, '');
+                    fs.writeFileSync('dist/public/index.html', html, 'utf-8');
+                    console.log('index.html generated');
+                    proc.kill();
+                    process.exit(0);
+                  }
+                } catch {}
+                await new Promise(r => setTimeout(r, 1000));
+              }
+              proc.kill();
+              console.error('Nitro server did not start');
+              process.exit(1);
+            }
+            main();
+          "
+
+          # pkg 配置
+          cat > dist/package.json << 'EOF'
+          {"name":"dev-mock-api","version":"1.0.0","pkg":{"assets":["public/**/*"]}}
+          EOF
+
+      # Step 5: pkg 打包
+      - name: Package executable
+        shell: bash
+        run: |
+          TARGET="node20-${{ matrix.platform }}-${{ matrix.arch }}"
+          SUFFIX=""
+          if [ "${{ matrix.platform }}" = "win" ]; then SUFFIX=".exe"; fi
+
+          npx @yao-pkg/pkg dist/standalone.cjs \
+            --targets "$TARGET" \
+            --output "dist/dev-mock-api${SUFFIX}" \
+            --compress GZip \
+            --config dist/package.json
+
+      # 压缩产物
+      - name: Archive artifact
+        shell: bash
+        run: |
+          cd dist
+          NAME="dev-mock-api-${{ matrix.platform }}-${{ matrix.arch }}"
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            7z a "../${NAME}.zip" dev-mock-api.exe
+          else
+            tar czf "../${NAME}.tar.gz" dev-mock-api
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dev-mock-api-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dev-mock-api-*.*
+
+  # 仅在 tag push 时发布 Release
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dev-mock-api-*.tar.gz
+            dev-mock-api-*.zip

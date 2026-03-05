@@ -5,9 +5,17 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const CERT_DIR = path.join(__dirname, '..', '.certs')
-const CA_KEY_PATH = path.join(CERT_DIR, 'ca.key.pem')
-const CA_CERT_PATH = path.join(CERT_DIR, 'ca.cert.pem')
+
+/** 获取证书目录（支持环境变量覆盖，用于 pkg 打包） */
+function getCertDirPath() {
+  return process.env.CERT_DIR || path.join(__dirname, '..', '.certs')
+}
+function getCAKeyPath() {
+  return path.join(getCertDirPath(), 'ca.key.pem')
+}
+function getCACertPathInternal() {
+  return path.join(getCertDirPath(), 'ca.cert.pem')
+}
 
 let caKeyForge: forge.pki.rsa.PrivateKey | null = null
 let caCertForge: forge.pki.Certificate | null = null
@@ -31,14 +39,15 @@ function generateKeyPair() {
 export function ensureCA() {
   if (caKeyForge && caCertForge) return
 
-  if (!fs.existsSync(CERT_DIR)) fs.mkdirSync(CERT_DIR, { recursive: true })
+  if (!fs.existsSync(getCertDirPath()))
+    fs.mkdirSync(getCertDirPath(), { recursive: true })
 
-  if (fs.existsSync(CA_KEY_PATH) && fs.existsSync(CA_CERT_PATH)) {
+  if (fs.existsSync(getCAKeyPath()) && fs.existsSync(getCACertPathInternal())) {
     caKeyForge = forge.pki.privateKeyFromPem(
-      fs.readFileSync(CA_KEY_PATH, 'utf-8'),
+      fs.readFileSync(getCAKeyPath(), 'utf-8'),
     )
     caCertForge = forge.pki.certificateFromPem(
-      fs.readFileSync(CA_CERT_PATH, 'utf-8'),
+      fs.readFileSync(getCACertPathInternal(), 'utf-8'),
     )
     return
   }
@@ -71,9 +80,9 @@ export function ensureCA() {
   caKeyForge = privateKey
   caCertForge = cert
 
-  fs.writeFileSync(CA_KEY_PATH, forge.pki.privateKeyToPem(privateKey))
-  fs.writeFileSync(CA_CERT_PATH, forge.pki.certificateToPem(cert))
-  console.log('  [CA] CA 根证书已生成:', CA_CERT_PATH)
+  fs.writeFileSync(getCAKeyPath(), forge.pki.privateKeyToPem(privateKey))
+  fs.writeFileSync(getCACertPathInternal(), forge.pki.certificateToPem(cert))
+  console.log('  [CA] CA 根证书已生成:', getCACertPathInternal())
 }
 
 /** 为指定域名生成 TLS 证书（CA 签发） */
@@ -112,5 +121,5 @@ export function getCert(hostname: string) {
 /** 获取 CA 证书文件路径 */
 export function getCACertPath() {
   ensureCA()
-  return CA_CERT_PATH
+  return getCACertPathInternal()
 }

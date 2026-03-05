@@ -3,7 +3,13 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const STORE_FILE = path.join(__dirname, '..', 'mock-data.json')
+
+/** 获取存储文件路径（支持环境变量覆盖，用于 pkg 打包） */
+function getStoreFile() {
+  return (
+    process.env.MOCK_DATA_FILE || path.join(__dirname, '..', 'mock-data.json')
+  )
+}
 
 export interface MockResponse {
   statusCode?: number
@@ -49,8 +55,8 @@ class MockStore {
   /** 从文件加载持久化的 mock 规则 */
   _load() {
     try {
-      if (fs.existsSync(STORE_FILE)) {
-        const data = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'))
+      if (fs.existsSync(getStoreFile())) {
+        const data = JSON.parse(fs.readFileSync(getStoreFile(), 'utf-8'))
         if (data.mocks) {
           Object.entries(data.mocks).forEach(([k, v]) =>
             this.mocks.set(k, v as MockRule),
@@ -65,7 +71,7 @@ class MockStore {
   /** 持久化 mock 规则到文件 */
   _save() {
     const data = { mocks: Object.fromEntries(this.mocks) }
-    fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8')
+    fs.writeFileSync(getStoreFile(), JSON.stringify(data, null, 2), 'utf-8')
   }
 
   addRecord(record: ProxyRecord) {

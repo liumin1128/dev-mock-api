@@ -6,9 +6,16 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+function getAppWritableDir() {
+  if (typeof process.pkg !== 'undefined') {
+    return path.dirname(process.execPath)
+  }
+  return path.join(__dirname, '..')
+}
+
 /** 获取证书目录（支持环境变量覆盖，用于 pkg 打包） */
 function getCertDirPath() {
-  return process.env.CERT_DIR || path.join(__dirname, '..', '.certs')
+  return process.env.CERT_DIR || path.join(getAppWritableDir(), '.certs')
 }
 function getCAKeyPath() {
   return path.join(getCertDirPath(), 'ca.key.pem')

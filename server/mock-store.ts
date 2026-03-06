@@ -4,10 +4,18 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+function getAppWritableDir() {
+  if (typeof process.pkg !== 'undefined') {
+    return path.dirname(process.execPath)
+  }
+  return path.join(__dirname, '..')
+}
+
 /** 获取存储文件路径（支持环境变量覆盖，用于 pkg 打包） */
 function getStoreFile() {
   return (
-    process.env.MOCK_DATA_FILE || path.join(__dirname, '..', 'mock-data.json')
+    process.env.MOCK_DATA_FILE ||
+    path.join(getAppWritableDir(), 'mock-data.json')
   )
 }
 

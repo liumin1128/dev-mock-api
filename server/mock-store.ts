@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 function getAppWritableDir() {
-  if (typeof process.pkg !== 'undefined') {
+  const pkgProcess = process as NodeJS.Process & { pkg?: unknown }
+  if (typeof pkgProcess.pkg !== 'undefined') {
     return path.dirname(process.execPath)
   }
   return path.join(__dirname, '..')

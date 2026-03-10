@@ -56,7 +56,7 @@ app.use((req: Request, res: Response) => {
   const { targetHost, targetPort, targetProtocol, urlPath } = target
 
   // 1. 检查是否有 mock 规则
-  const mock = store.getMock(method, urlPath)
+  const mock = store.findMatchingRule(method, urlPath, null)
   if (mock && mock.response) {
     serveMock(req, res, method, urlPath, targetHost, mock.response)
     return

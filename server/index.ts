@@ -37,16 +37,9 @@ app.use((req: Request, res: Response) => {
   }
   const { targetHost, targetPort, targetProtocol, urlPath } = target
 
-  // 先收集请求体，再进行多维条件匹配
+  // 先收集请求体，再进行匹配
   collectRequestBody(req, (reqBody) => {
-    const queryParams = parseQueryParams(urlPath)
-    const mock = store.findMatchingRule(
-      method,
-      urlPath,
-      req.headers as Record<string, string>,
-      reqBody,
-      queryParams,
-    )
+    const mock = store.findMatchingRule(method, urlPath, reqBody)
     if (mock) {
       serveMock(req, res, method, urlPath, targetHost, mock.response, reqBody)
       return
@@ -62,17 +55,6 @@ app.use((req: Request, res: Response) => {
     )
   })
 })
-
-/** 解析 URL 中的 query 参数 */
-function parseQueryParams(urlPath: string): Record<string, string> {
-  const qIndex = urlPath.indexOf('?')
-  if (qIndex === -1) return {}
-  try {
-    return Object.fromEntries(new URLSearchParams(urlPath.slice(qIndex + 1)))
-  } catch {
-    return {}
-  }
-}
 
 interface ProxyTarget {
   targetHost: string

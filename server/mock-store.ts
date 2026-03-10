@@ -27,28 +27,16 @@ export interface MockResponse {
   body?: unknown
 }
 
-/**
- * 请求匹配条件。所有字段均可缺省，缺省表示通配（*）。
- * 条件值支持以下语法：
- *   "value"        — 精确匹配
- *   "prefix*"      — 通配符（* 匹配任意字符序列）
- *   "/regex/flags" — 正则匹配
- *   "$exists"      — 字段存在且非空即满足
- */
-export interface MatchConditions {
-  requestHeaders?: Record<string, string>
-  requestBody?: Record<string, unknown>
-  queryParams?: Record<string, string>
-}
-
 export interface MockRule {
   id: string
   name?: string
   pinned: boolean
   method: string
+  /** 精确匹配（path + query，query 参数按 key 排序后比较） */
   urlPath: string
   priority: number
-  conditions: MatchConditions
+  /** 请求体子集匹配：request body 包含此 JSON 的全部字段则命中 */
+  matchBody?: Record<string, unknown>
   response: MockResponse
   updatedAt: string
 }
@@ -68,100 +56,58 @@ export interface ProxyRecord {
 
 // ─── 匹配工具函数 ────────────────────────────────────────────────
 
-/** 匹配单个条件值 */
-function matchValue(actual: string | undefined, pattern: string): boolean {
-  if (pattern === '$exists') return actual !== undefined && actual !== ''
-  if (actual === undefined || actual === null) return false
-  const regexMatch = pattern.match(/^\/(.+)\/([gimsuy]*)$/)
-  if (regexMatch) {
-    try {
-      return new RegExp(regexMatch[1], regexMatch[2]).test(actual)
-    } catch {
-      return false
-    }
-  }
-  if (pattern.includes('*')) {
-    const escaped = pattern
-      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*/g, '.*')
-    return new RegExp('^' + escaped + '$').test(actual)
-  }
-  return actual === pattern
+/** 标准化 URL：path + query（query 参数按 key 排序） */
+function normalizeUrl(urlPath: string): string {
+  const qIndex = urlPath.indexOf('?')
+  if (qIndex === -1) return urlPath
+  const pathPart = urlPath.slice(0, qIndex)
+  const params = new URLSearchParams(urlPath.slice(qIndex + 1))
+  params.sort()
+  const qs = params.toString()
+  return qs ? `${pathPart}?${qs}` : pathPart
 }
 
-/** 按点路径获取嵌套值（如 "user.role"） */
-function getNestedValue(obj: unknown, dotPath: string): unknown {
-  return dotPath.split('.').reduce((curr: unknown, key) => {
-    if (curr && typeof curr === 'object')
-      return (curr as Record<string, unknown>)[key]
-    return undefined
-  }, obj)
-}
-
-/** URL path 通配符匹配（忽略 query string） */
-function matchUrlPath(pattern: string, urlPath: string): boolean {
-  const cleanPath = urlPath.split('?')[0]
-  const cleanPattern = pattern.split('?')[0]
-  if (!cleanPattern.includes('*')) return cleanPath === cleanPattern
-  const escaped = cleanPattern
-    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*/g, '.*')
-  return new RegExp('^' + escaped + '$').test(cleanPath)
-}
-
-/**
- * 评估条件匹配得分。
- * 返回命中条件数（≥0），返回 -1 表示存在条件不满足。
- */
-function scoreConditions(
-  conditions: MatchConditions,
-  reqHeaders: Record<string, string>,
-  reqBody: unknown,
-  queryParams: Record<string, string>,
-): number {
-  let score = 0
-  if (conditions.requestHeaders) {
-    for (const [k, v] of Object.entries(conditions.requestHeaders)) {
-      if (!matchValue(reqHeaders[k.toLowerCase()], v)) return -1
-      score++
+/** 判断 obj 是否包含 subset 的全部字段（递归深度比较） */
+function isBodySubset(subset: Record<string, unknown>, obj: unknown): boolean {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
+  const record = obj as Record<string, unknown>
+  for (const [key, value] of Object.entries(subset)) {
+    if (!(key in record)) return false
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      if (!isBodySubset(value as Record<string, unknown>, record[key]))
+        return false
+    } else {
+      if (JSON.stringify(record[key]) !== JSON.stringify(value)) return false
     }
   }
-  if (conditions.requestBody) {
-    for (const [dotPath, v] of Object.entries(conditions.requestBody)) {
-      const actual = getNestedValue(reqBody, dotPath)
-      if (
-        !matchValue(
-          actual !== undefined ? String(actual) : undefined,
-          String(v),
-        )
-      )
-        return -1
-      score++
-    }
-  }
-  if (conditions.queryParams) {
-    for (const [k, v] of Object.entries(conditions.queryParams)) {
-      if (!matchValue(queryParams[k], v)) return -1
-      score++
-    }
-  }
-  return score
+  return true
 }
 
 /** 旧格式（Record<string, MockRule>）迁移到新格式（MockRule[]） */
 function migrateOldFormat(oldMocks: Record<string, unknown>): MockRule[] {
   return Object.entries(oldMocks).map(([key, v]) => {
-    const old = v as Partial<MockRule>
+    const old = v as Partial<MockRule> & {
+      conditions?: {
+        requestBody?: Record<string, unknown>
+      }
+    }
     const spaceIdx = key.indexOf(' ')
     const method = key.slice(0, spaceIdx) || 'GET'
     const urlPath = key.slice(spaceIdx + 1) || '/'
+    // 将旧 conditions.requestBody 迁移为 matchBody
+    const matchBody =
+      old.matchBody ??
+      (old.conditions?.requestBody &&
+      Object.keys(old.conditions.requestBody).length > 0
+        ? old.conditions.requestBody
+        : undefined)
     return {
       id: randomUUID(),
       pinned: old.pinned ?? false,
       method: old.method ?? method,
       urlPath: old.urlPath ?? urlPath,
       priority: 0,
-      conditions: {},
+      matchBody,
       response: old.response ?? {},
       updatedAt: old.updatedAt ?? new Date().toISOString(),
     }
@@ -184,7 +130,21 @@ class MockStore {
       if (fs.existsSync(getStoreFile())) {
         const data = JSON.parse(fs.readFileSync(getStoreFile(), 'utf-8'))
         if (Array.isArray(data.mocks)) {
-          this.mocks = data.mocks as MockRule[]
+          this.mocks = (data.mocks as unknown[]).map((raw) => {
+            // 自动迁移旧 conditions.requestBody → matchBody
+            const rule = raw as Record<string, unknown>
+            const conditions = rule.conditions as
+              | { requestBody?: Record<string, unknown> }
+              | undefined
+            if (!rule.matchBody && conditions?.requestBody) {
+              const body = conditions.requestBody
+              if (Object.keys(body).length > 0) {
+                rule.matchBody = body
+              }
+            }
+            delete rule.conditions
+            return rule as unknown as MockRule
+          })
         } else if (data.mocks && typeof data.mocks === 'object') {
           // 自动迁移旧格式
           this.mocks = migrateOldFormat(data.mocks as Record<string, unknown>)
@@ -220,28 +180,27 @@ class MockStore {
   }
 
   /**
-   * 多维度匹配：返回最优 MockRule 或 null。
-   * 优先级：条件命中数 > priority > 最近更新
+   * 匹配规则：method + urlPath(精确) + matchBody(子集)。
+   * 优先级：matchBody 字段数 > priority > 最近更新
    */
   findMatchingRule(
     method: string,
     urlPath: string,
-    reqHeaders: Record<string, string>,
     reqBody: unknown,
-    queryParams: Record<string, string>,
   ): MockRule | null {
+    const normalizedUrl = normalizeUrl(urlPath)
     const candidates: Array<{ rule: MockRule; score: number }> = []
     for (const rule of this.mocks) {
       if (rule.method.toUpperCase() !== method.toUpperCase()) continue
-      if (!matchUrlPath(rule.urlPath, urlPath)) continue
-      const score = scoreConditions(
-        rule.conditions ?? {},
-        reqHeaders,
-        reqBody,
-        queryParams,
-      )
-      if (score < 0) continue
-      candidates.push({ rule, score })
+      if (normalizeUrl(rule.urlPath) !== normalizedUrl) continue
+      // matchBody 子集匹配
+      const mb = rule.matchBody
+      if (mb && Object.keys(mb).length > 0) {
+        if (!isBodySubset(mb, reqBody)) continue
+        candidates.push({ rule, score: Object.keys(mb).length })
+      } else {
+        candidates.push({ rule, score: 0 })
+      }
     }
     if (candidates.length === 0) return null
     candidates.sort((a, b) => {
@@ -268,13 +227,18 @@ class MockStore {
     )
   }
 
-  pinRecord(method: string, urlPath: string, response: MockResponse) {
-    // 更新已有空条件规则，否则插入新规则
+  pinRecord(
+    method: string,
+    urlPath: string,
+    response: MockResponse,
+    matchBody?: Record<string, unknown>,
+  ) {
+    // 查找相同 method + urlPath + matchBody 的已有规则
     const existing = this.mocks.find(
       (r) =>
         r.method.toUpperCase() === method.toUpperCase() &&
         r.urlPath === urlPath &&
-        Object.keys(r.conditions ?? {}).length === 0,
+        JSON.stringify(r.matchBody) === JSON.stringify(matchBody),
     )
     if (existing) {
       existing.pinned = true
@@ -287,7 +251,7 @@ class MockStore {
         method: method.toUpperCase(),
         urlPath,
         priority: 0,
-        conditions: {},
+        matchBody,
         response,
         updatedAt: new Date().toISOString(),
       })
@@ -299,18 +263,17 @@ class MockStore {
     method: string,
     urlPath: string,
     response: MockResponse,
-    conditions?: MatchConditions,
+    matchBody?: Record<string, unknown>,
     priority?: number,
     name?: string,
   ) {
-    const conds = conditions ?? {}
-    // 仅当 conditions 完全相同（均为空对象）时才复用已有规则
+    // 仅当 matchBody 均为空时才复用已有规则
     const existing = this.mocks.find(
       (r) =>
         r.method.toUpperCase() === method.toUpperCase() &&
         r.urlPath === urlPath &&
-        Object.keys(r.conditions ?? {}).length === 0 &&
-        Object.keys(conds).length === 0,
+        !r.matchBody &&
+        !matchBody,
     )
     if (existing) {
       existing.response = response
@@ -325,7 +288,7 @@ class MockStore {
         method: method.toUpperCase(),
         urlPath,
         priority: priority ?? 0,
-        conditions: conds,
+        matchBody,
         response,
         updatedAt: new Date().toISOString(),
       })

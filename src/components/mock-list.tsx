@@ -11,23 +11,13 @@ interface MockListProps {
   onRemove: (id: string) => void
 }
 
-/** 生成条件摘要 badge 列表 */
-function ConditionBadges({ rule }: { rule: MockRule }) {
-  const conds = rule.conditions ?? {}
-  const parts: string[] = []
-  if (conds.requestBody)
-    Object.entries(conds.requestBody).forEach(([k, v]) =>
-      parts.push(`body.${k}=${v}`),
-    )
-  if (conds.queryParams)
-    Object.entries(conds.queryParams).forEach(([k, v]) =>
-      parts.push(`?${k}=${v}`),
-    )
-  if (conds.requestHeaders)
-    Object.entries(conds.requestHeaders).forEach(([k, v]) =>
-      parts.push(`hdr.${k}=${v}`),
-    )
-  if (parts.length === 0) return null
+/** 生成 matchBody 摘要 badge 列表 */
+function MatchBodyBadges({ rule }: { rule: MockRule }) {
+  const mb = rule.matchBody
+  if (!mb || Object.keys(mb).length === 0) return null
+  const parts = Object.entries(mb).map(
+    ([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : String(v)}`,
+  )
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       {parts.map((p) => (
@@ -96,7 +86,7 @@ export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
                 {rule.name}
               </p>
             )}
-            <ConditionBadges rule={rule} />
+            <MatchBodyBadges rule={rule} />
           </div>
           <span className="pt-0.5 text-xs text-muted-foreground">
             {new Date(rule.updatedAt).toLocaleString('zh-CN', {

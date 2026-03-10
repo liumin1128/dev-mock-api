@@ -60,11 +60,23 @@ function App() {
 
   const handlePin = useCallback(
     async (record: ProxyRecord) => {
-      await pinMock(record.method, record.urlPath, {
-        statusCode: record.statusCode,
-        headers: record.responseHeaders,
-        body: record.responseBody,
-      })
+      // 将当前 request body 作为精确匹配条件
+      const matchBody =
+        record.requestBody &&
+        typeof record.requestBody === 'object' &&
+        !Array.isArray(record.requestBody)
+          ? (record.requestBody as Record<string, unknown>)
+          : undefined
+      await pinMock(
+        record.method,
+        record.urlPath,
+        {
+          statusCode: record.statusCode,
+          headers: record.responseHeaders,
+          body: record.responseBody,
+        },
+        matchBody,
+      )
       refreshMocks()
       toast.success(`已 Pin: ${record.method} ${record.urlPath}`)
     },
@@ -77,7 +89,7 @@ function App() {
         (r) =>
           r.method === record.method &&
           r.urlPath === record.urlPath &&
-          Object.keys(r.conditions ?? {}).length === 0,
+          !r.matchBody,
       )
       if (rule) await removeMock(rule.id)
       refreshMocks()
@@ -98,7 +110,7 @@ function App() {
         (r) =>
           r.method === record.method &&
           r.urlPath === record.urlPath &&
-          Object.keys(r.conditions ?? {}).length === 0,
+          !r.matchBody,
       )
       setEditorData({
         mode: 'edit',
@@ -106,7 +118,7 @@ function App() {
         method: record.method,
         urlPath: record.urlPath,
         response: JSON.stringify(response, null, 2),
-        conditions: existing?.conditions,
+        matchBody: existing?.matchBody,
         priority: existing?.priority,
         name: existing?.name,
       })
@@ -122,7 +134,7 @@ function App() {
       method: rule.method,
       urlPath: rule.urlPath,
       response: JSON.stringify(rule.response, null, 2),
-      conditions: rule.conditions,
+      matchBody: rule.matchBody,
       priority: rule.priority,
       name: rule.name,
     })
@@ -159,14 +171,16 @@ function App() {
       if (params.id) {
         // 编辑已有规则
         await updateMock(params.id, {
+          method: params.method,
+          urlPath: params.urlPath,
           response: parsed as import('@/lib/api').MockResponse,
-          conditions: params.conditions,
+          matchBody: params.matchBody,
           priority: params.priority,
           name: params.name,
         })
       } else {
         await setMock(params.method, params.urlPath, parsed, {
-          conditions: params.conditions,
+          matchBody: params.matchBody,
           priority: params.priority,
           name: params.name,
         })

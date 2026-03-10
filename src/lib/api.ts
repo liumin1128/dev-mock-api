@@ -25,20 +25,6 @@ export interface MockResponse {
   body?: unknown
 }
 
-/**
- * 请求匹配条件。所有字段均可缺省，缺省表示通配（*）。
- * 条件值语法：
- *   "value"        — 精确匹配
- *   "prefix*"      — 通配符
- *   "/regex/flags" — 正则
- *   "$exists"      — 字段存在即满足
- */
-export interface MatchConditions {
-  requestHeaders?: Record<string, string>
-  requestBody?: Record<string, unknown>
-  queryParams?: Record<string, string>
-}
-
 export interface MockRule {
   id: string
   name?: string
@@ -46,7 +32,8 @@ export interface MockRule {
   method: string
   urlPath: string
   priority: number
-  conditions: MatchConditions
+  /** 请求体子集匹配：request body 包含此 JSON 的全部字段则命中 */
+  matchBody?: Record<string, unknown>
   response: MockResponse
   updatedAt: string
 }
@@ -79,21 +66,22 @@ export function pinMock(
   method: string,
   urlPath: string,
   response: MockResponse,
+  matchBody?: Record<string, unknown>,
 ) {
   return request<{ ok: boolean }>('/mocks/pin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method, urlPath, response }),
+    body: JSON.stringify({ method, urlPath, response, matchBody }),
   })
 }
 
-/** 手动设置 mock 规则（支持 conditions、priority、name） */
+/** 手动设置 mock 规则（支持 matchBody、priority、name） */
 export function setMock(
   method: string,
   urlPath: string,
   response: unknown,
   options?: {
-    conditions?: MatchConditions
+    matchBody?: Record<string, unknown>
     priority?: number
     name?: string
   },
@@ -105,7 +93,7 @@ export function setMock(
       method,
       urlPath,
       response,
-      conditions: options?.conditions,
+      matchBody: options?.matchBody,
       priority: options?.priority,
       name: options?.name,
     }),

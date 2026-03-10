@@ -33,23 +33,23 @@ router.get('/mocks', (_req, res) => {
 
 /** Pin 住某个记录 */
 router.post('/mocks/pin', express.json(), (req, res) => {
-  const { method, urlPath, response } = req.body
+  const { method, urlPath, response, matchBody } = req.body
   if (!method || !urlPath || response === undefined) {
     res.status(400).json({ error: '缺少 method / urlPath / response' })
     return
   }
-  store.pinRecord(method, urlPath, response)
+  store.pinRecord(method, urlPath, response, matchBody)
   res.json({ ok: true })
 })
 
-/** 手动设置 mock 响应（支持 conditions、priority、name） */
+/** 手动设置 mock 响应（支持 matchBody、priority、name） */
 router.post('/mocks/set', express.json({ limit: '10mb' }), (req, res) => {
-  const { method, urlPath, response, conditions, priority, name } = req.body
+  const { method, urlPath, response, matchBody, priority, name } = req.body
   if (!method || !urlPath || response === undefined) {
     res.status(400).json({ error: '缺少 method / urlPath / response' })
     return
   }
-  store.setMockResponse(method, urlPath, response, conditions, priority, name)
+  store.setMockResponse(method, urlPath, response, matchBody, priority, name)
   res.json({ ok: true })
 })
 

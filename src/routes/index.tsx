@@ -20,9 +20,12 @@ import {
   pinMock,
   removeMock,
   setMock,
+  updateMock,
   getCACertUrl,
   type ProxyRecord,
+  type MockRule,
 } from '@/lib/api'
+import type { MockSaveParams } from '@/components/mock-editor-dialog'
 
 import { Radio, ShieldCheck, Plus, Trash2, RefreshCw } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -70,50 +73,67 @@ function App() {
 
   const handleUnpin = useCallback(
     async (record: ProxyRecord) => {
-      await removeMock(record.method, record.urlPath)
+      const rule = mocks.find(
+        (r) =>
+          r.method === record.method &&
+          r.urlPath === record.urlPath &&
+          Object.keys(r.conditions ?? {}).length === 0,
+      )
+      if (rule) await removeMock(rule.id)
       refreshMocks()
       toast.success(`已取消 Pin: ${record.method} ${record.urlPath}`)
     },
-    [refreshMocks],
+    [mocks, refreshMocks],
   )
 
-  const handleEditFromDetail = useCallback((record: ProxyRecord) => {
-    const response = {
-      statusCode: record.statusCode,
-      headers: record.responseHeaders,
-      body: record.responseBody,
-    }
-    setEditorData({
-      mode: 'edit',
-      method: record.method,
-      urlPath: record.urlPath,
-      response: JSON.stringify(response, null, 2),
-    })
-    setEditorOpen(true)
-  }, [])
-
-  const handleEditMock = useCallback(
-    (method: string, urlPath: string) => {
-      const key = `${method} ${urlPath}`
-      const rule = mocks[key]
-      if (rule) {
-        setEditorData({
-          mode: 'edit',
-          method,
-          urlPath,
-          response: JSON.stringify(rule.response, null, 2),
-        })
-        setEditorOpen(true)
+  const handleEditFromDetail = useCallback(
+    (record: ProxyRecord) => {
+      const response = {
+        statusCode: record.statusCode,
+        headers: record.responseHeaders,
+        body: record.responseBody,
       }
+      // 查找已有的无条件规则
+      const existing = mocks.find(
+        (r) =>
+          r.method === record.method &&
+          r.urlPath === record.urlPath &&
+          Object.keys(r.conditions ?? {}).length === 0,
+      )
+      setEditorData({
+        mode: 'edit',
+        id: existing?.id,
+        method: record.method,
+        urlPath: record.urlPath,
+        response: JSON.stringify(response, null, 2),
+        conditions: existing?.conditions,
+        priority: existing?.priority,
+        name: existing?.name,
+      })
+      setEditorOpen(true)
     },
     [mocks],
   )
 
+  const handleEditMock = useCallback((rule: MockRule) => {
+    setEditorData({
+      mode: 'edit',
+      id: rule.id,
+      method: rule.method,
+      urlPath: rule.urlPath,
+      response: JSON.stringify(rule.response, null, 2),
+      conditions: rule.conditions,
+      priority: rule.priority,
+      name: rule.name,
+    })
+    setEditorOpen(true)
+  }, [])
+
   const handleRemoveMock = useCallback(
-    async (method: string, urlPath: string) => {
-      await removeMock(method, urlPath)
+    async (id: string) => {
+      await removeMock(id)
       refreshMocks()
-      toast.success(`已删除: ${method} ${urlPath}`)
+      toast.success('已删除 Mock 规则')
     },
     [refreshMocks],
   )
@@ -129,16 +149,30 @@ function App() {
   }, [])
 
   const handleSaveMock = useCallback(
-    async (method: string, urlPath: string, response: string) => {
+    async (params: MockSaveParams) => {
       let parsed: unknown
       try {
-        parsed = JSON.parse(response)
+        parsed = JSON.parse(params.response)
       } catch {
-        parsed = response
+        parsed = params.response
       }
-      await setMock(method, urlPath, parsed)
+      if (params.id) {
+        // 编辑已有规则
+        await updateMock(params.id, {
+          response: parsed as import('@/lib/api').MockResponse,
+          conditions: params.conditions,
+          priority: params.priority,
+          name: params.name,
+        })
+      } else {
+        await setMock(params.method, params.urlPath, parsed, {
+          conditions: params.conditions,
+          priority: params.priority,
+          name: params.name,
+        })
+      }
       refreshMocks()
-      toast.success(`Mock 已保存: ${method} ${urlPath}`)
+      toast.success(`Mock 已保存: ${params.method} ${params.urlPath}`)
     },
     [refreshMocks],
   )
@@ -195,9 +229,9 @@ function App() {
               className="relative h-10 rounded-none border-b-2 border-transparent px-4 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
               📌 Mock 规则
-              {Object.keys(mocks).length > 0 && (
+              {mocks.length > 0 && (
                 <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
-                  {Object.keys(mocks).length}
+                  {mocks.length}
                 </span>
               )}
             </TabsTrigger>

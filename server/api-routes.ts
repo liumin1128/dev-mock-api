@@ -26,7 +26,7 @@ router.delete('/records', (_req, res) => {
   res.json({ ok: true })
 })
 
-/** 获取所有 mock 规则 */
+/** 获取所有 mock 规则（返回数组，按 updatedAt 降序） */
 router.get('/mocks', (_req, res) => {
   res.json(store.getAllMocks())
 })
@@ -42,25 +42,36 @@ router.post('/mocks/pin', express.json(), (req, res) => {
   res.json({ ok: true })
 })
 
-/** 手动设置 mock 响应 */
+/** 手动设置 mock 响应（支持 conditions、priority、name） */
 router.post('/mocks/set', express.json({ limit: '10mb' }), (req, res) => {
-  const { method, urlPath, response } = req.body
+  const { method, urlPath, response, conditions, priority, name } = req.body
   if (!method || !urlPath || response === undefined) {
     res.status(400).json({ error: '缺少 method / urlPath / response' })
     return
   }
-  store.setMockResponse(method, urlPath, response)
+  store.setMockResponse(method, urlPath, response, conditions, priority, name)
   res.json({ ok: true })
 })
 
-/** 删除某条 mock 规则 */
-router.delete('/mocks', express.json(), (req, res) => {
-  const { method, urlPath } = req.body
-  if (!method || !urlPath) {
-    res.status(400).json({ error: '缺少 method / urlPath' })
+/** 更新单条 mock 规则（按 id） */
+router.put('/mocks/:id', express.json({ limit: '10mb' }), (req, res) => {
+  const { id } = req.params
+  const ok = store.updateMockById(id, req.body)
+  if (!ok) {
+    res.status(404).json({ error: '规则不存在' })
     return
   }
-  store.removeMock(method, urlPath)
+  res.json({ ok: true })
+})
+
+/** 删除某条 mock 规则（按 id） */
+router.delete('/mocks/:id', (req, res) => {
+  const { id } = req.params
+  const ok = store.removeMockById(id)
+  if (!ok) {
+    res.status(404).json({ error: '规则不存在' })
+    return
+  }
   res.json({ ok: true })
 })
 

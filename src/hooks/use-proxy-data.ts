@@ -3,7 +3,7 @@ import {
   fetchRecords,
   fetchMocks,
   type ProxyRecord,
-  type MocksMap,
+  type MockRule,
 } from '@/lib/api'
 
 /** 请求记录轮询 Hook */
@@ -38,7 +38,7 @@ export function useRecords(interval = 2000) {
 
 /** Mock 规则轮询 Hook */
 export function useMocks(interval = 2000) {
-  const [mocks, setMocks] = useState<MocksMap>({})
+  const [mocks, setMocks] = useState<MockRule[]>([])
   const [loading, setLoading] = useState(true)
   const mountedRef = useRef(true)
 

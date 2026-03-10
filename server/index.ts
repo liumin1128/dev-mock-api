@@ -37,24 +37,42 @@ app.use((req: Request, res: Response) => {
   }
   const { targetHost, targetPort, targetProtocol, urlPath } = target
 
-  // 1. 检查是否有 mock 规则
-  const mock = store.getMock(method, urlPath)
-  if (mock && mock.response) {
-    serveMock(req, res, method, urlPath, targetHost, mock.response)
-    return
-  }
-
-  // 2. 无 mock，转发到目标服务器
-  proxyRequest(
-    req,
-    res,
-    method,
-    urlPath,
-    targetHost,
-    targetPort,
-    targetProtocol,
-  )
+  // 先收集请求体，再进行多维条件匹配
+  collectRequestBody(req, (reqBody) => {
+    const queryParams = parseQueryParams(urlPath)
+    const mock = store.findMatchingRule(
+      method,
+      urlPath,
+      req.headers as Record<string, string>,
+      reqBody,
+      queryParams,
+    )
+    if (mock) {
+      serveMock(req, res, method, urlPath, targetHost, mock.response, reqBody)
+      return
+    }
+    proxyRequest(
+      req,
+      res,
+      method,
+      urlPath,
+      targetHost,
+      targetPort,
+      targetProtocol,
+    )
+  })
 })
+
+/** 解析 URL 中的 query 参数 */
+function parseQueryParams(urlPath: string): Record<string, string> {
+  const qIndex = urlPath.indexOf('?')
+  if (qIndex === -1) return {}
+  try {
+    return Object.fromEntries(new URLSearchParams(urlPath.slice(qIndex + 1)))
+  } catch {
+    return {}
+  }
+}
 
 interface ProxyTarget {
   targetHost: string
@@ -111,7 +129,7 @@ function resolveTarget(req: Request): ProxyTarget | null {
   return null
 }
 
-/** 返回 mock 数据 */
+/** 返回 mock 数据（reqBody 由调用方预先收集传入） */
 function serveMock(
   req: Request,
   res: Response,
@@ -119,25 +137,24 @@ function serveMock(
   urlPath: string,
   targetHost: string,
   mockResponse: MockResponse,
+  reqBody: unknown,
 ) {
   const statusCode = (mockResponse.statusCode as number) || 200
   const headers = (mockResponse.headers as Record<string, string>) || {}
   const body =
     mockResponse.body !== undefined ? mockResponse.body : mockResponse
 
-  collectRequestBody(req, (reqBody) => {
-    store.addRecord({
-      method,
-      urlPath,
-      targetHost,
-      requestHeaders: filterHeaders(req.headers as Record<string, string>),
-      requestBody: reqBody,
-      statusCode,
-      responseHeaders: headers,
-      responseBody: body,
-      source: 'mock',
-      timestamp: new Date().toISOString(),
-    })
+  store.addRecord({
+    method,
+    urlPath,
+    targetHost,
+    requestHeaders: filterHeaders(req.headers as Record<string, string>),
+    requestBody: reqBody ?? null,
+    statusCode,
+    responseHeaders: headers,
+    responseBody: body,
+    source: 'mock',
+    timestamp: new Date().toISOString(),
   })
 
   const contentType =
@@ -244,12 +261,25 @@ function proxyRequest(
     res.status(502).json({ error: 'Proxy Error', message: err.message })
   })
 
-  req.pipe(proxyReq)
+  // 若请求体已被收集（用于 mock 匹配），用缓存的原始 Buffer 回放；否则直接 pipe
+  const extReq = req as ExtRequest
+  if (extReq._rawBodyBuffer && extReq._rawBodyBuffer.length > 0) {
+    proxyReq.write(extReq._rawBodyBuffer)
+    proxyReq.end()
+  } else {
+    req.pipe(proxyReq)
+  }
 }
 
-/** 收集请求体 */
+type ExtRequest = Request & {
+  _bodyCollected?: boolean
+  _collectedBody?: unknown
+  _rawBodyBuffer?: Buffer
+}
+
+/** 收集请求体（同时缓存原始 Buffer，供 proxyRequest 回放） */
 function collectRequestBody(
-  req: Request & { _bodyCollected?: boolean; _collectedBody?: unknown },
+  req: ExtRequest,
   callback: (body: unknown) => void,
 ) {
   if (req._bodyCollected) {
@@ -265,7 +295,9 @@ function collectRequestBody(
   const chunks: Buffer[] = []
   req.on('data', (chunk: Buffer) => chunks.push(chunk))
   req.on('end', () => {
-    let body: unknown = Buffer.concat(chunks).toString('utf-8')
+    const rawBuffer = Buffer.concat(chunks)
+    req._rawBodyBuffer = rawBuffer
+    let body: unknown = rawBuffer.toString('utf-8')
     try {
       body = JSON.parse(body as string)
     } catch {

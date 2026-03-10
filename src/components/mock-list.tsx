@@ -2,19 +2,49 @@ import { Button } from '@/components/ui/button'
 import { MethodBadge } from '@/components/badges'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/empty-state'
-import type { MocksMap } from '@/lib/api'
+import type { MockRule } from '@/lib/api'
 import { Pencil, Trash2 } from 'lucide-react'
 
 interface MockListProps {
-  mocks: MocksMap
-  onEdit: (method: string, urlPath: string) => void
-  onRemove: (method: string, urlPath: string) => void
+  mocks: MockRule[]
+  onEdit: (rule: MockRule) => void
+  onRemove: (id: string) => void
+}
+
+/** 生成条件摘要 badge 列表 */
+function ConditionBadges({ rule }: { rule: MockRule }) {
+  const conds = rule.conditions ?? {}
+  const parts: string[] = []
+  if (conds.requestBody)
+    Object.entries(conds.requestBody).forEach(([k, v]) =>
+      parts.push(`body.${k}=${v}`),
+    )
+  if (conds.queryParams)
+    Object.entries(conds.queryParams).forEach(([k, v]) =>
+      parts.push(`?${k}=${v}`),
+    )
+  if (conds.requestHeaders)
+    Object.entries(conds.requestHeaders).forEach(([k, v]) =>
+      parts.push(`hdr.${k}=${v}`),
+    )
+  if (parts.length === 0) return null
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {parts.map((p) => (
+        <Badge
+          key={p}
+          variant="outline"
+          className="border-blue-500/30 bg-blue-500/10 font-mono text-[10px] text-blue-600 dark:text-blue-400"
+        >
+          {p}
+        </Badge>
+      ))}
+    </div>
+  )
 }
 
 export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
-  const entries = Object.entries(mocks)
-
-  if (entries.length === 0) {
+  if (mocks.length === 0) {
     return (
       <EmptyState
         icon="📌"
@@ -26,33 +56,49 @@ export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
 
   return (
     <div className="flex flex-col">
-      {entries.map(([key, rule]) => (
+      {mocks.map((rule) => (
         <div
-          key={key}
-          className="grid grid-cols-[4rem_1fr_6.25rem_auto] items-center gap-3 border-b px-4 py-3"
+          key={rule.id}
+          className="grid grid-cols-[4rem_1fr_6.25rem_auto] items-start gap-3 border-b px-4 py-3"
         >
           <MethodBadge method={rule.method} />
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-mono text-sm" title={rule.urlPath}>
-              {rule.urlPath}
-            </span>
-            {rule.pinned ? (
-              <Badge
-                variant="outline"
-                className="shrink-0 border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-600 dark:text-yellow-400"
-              >
-                📌 Pinned
-              </Badge>
-            ) : (
-              <Badge
-                variant="outline"
-                className="shrink-0 border-violet-500/30 bg-violet-500/10 text-xs text-violet-600 dark:text-violet-400"
-              >
-                ✏️ Custom
-              </Badge>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-mono text-sm" title={rule.urlPath}>
+                {rule.urlPath}
+              </span>
+              {rule.pinned ? (
+                <Badge
+                  variant="outline"
+                  className="shrink-0 border-yellow-500/30 bg-yellow-500/10 text-xs text-yellow-600 dark:text-yellow-400"
+                >
+                  📌 Pinned
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="shrink-0 border-violet-500/30 bg-violet-500/10 text-xs text-violet-600 dark:text-violet-400"
+                >
+                  ✏️ Custom
+                </Badge>
+              )}
+              {rule.priority > 0 && (
+                <Badge
+                  variant="outline"
+                  className="shrink-0 border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600 dark:text-emerald-400"
+                >
+                  P{rule.priority}
+                </Badge>
+              )}
+            </div>
+            {rule.name && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {rule.name}
+              </p>
             )}
+            <ConditionBadges rule={rule} />
           </div>
-          <span className="text-xs text-muted-foreground">
+          <span className="pt-0.5 text-xs text-muted-foreground">
             {new Date(rule.updatedAt).toLocaleString('zh-CN', {
               hour12: false,
               month: '2-digit',
@@ -61,12 +107,12 @@ export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
               minute: '2-digit',
             })}
           </span>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 pt-0.5">
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={() => onEdit(rule.method, rule.urlPath)}
+              onClick={() => onEdit(rule)}
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
@@ -74,7 +120,7 @@ export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
               variant="ghost"
               size="icon"
               className="h-7 w-7 text-destructive hover:text-destructive"
-              onClick={() => onRemove(rule.method, rule.urlPath)}
+              onClick={() => onRemove(rule.id)}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>

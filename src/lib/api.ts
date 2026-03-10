@@ -25,15 +25,31 @@ export interface MockResponse {
   body?: unknown
 }
 
+/**
+ * 请求匹配条件。所有字段均可缺省，缺省表示通配（*）。
+ * 条件值语法：
+ *   "value"        — 精确匹配
+ *   "prefix*"      — 通配符
+ *   "/regex/flags" — 正则
+ *   "$exists"      — 字段存在即满足
+ */
+export interface MatchConditions {
+  requestHeaders?: Record<string, string>
+  requestBody?: Record<string, unknown>
+  queryParams?: Record<string, string>
+}
+
 export interface MockRule {
+  id: string
+  name?: string
   pinned: boolean
   method: string
   urlPath: string
+  priority: number
+  conditions: MatchConditions
   response: MockResponse
   updatedAt: string
 }
-
-export type MocksMap = Record<string, MockRule>
 
 // ==================== API Client ====================
 
@@ -53,9 +69,9 @@ export function clearRecords() {
   return request<{ ok: boolean }>('/records', { method: 'DELETE' })
 }
 
-/** 获取所有 mock 规则 */
+/** 获取所有 mock 规则（返回数组） */
 export function fetchMocks() {
-  return request<MocksMap>('/mocks')
+  return request<MockRule[]>('/mocks')
 }
 
 /** Pin 住某条记录的响应 */
@@ -71,21 +87,44 @@ export function pinMock(
   })
 }
 
-/** 手动设置 mock 规则 */
-export function setMock(method: string, urlPath: string, response: unknown) {
+/** 手动设置 mock 规则（支持 conditions、priority、name） */
+export function setMock(
+  method: string,
+  urlPath: string,
+  response: unknown,
+  options?: {
+    conditions?: MatchConditions
+    priority?: number
+    name?: string
+  },
+) {
   return request<{ ok: boolean }>('/mocks/set', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method, urlPath, response }),
+    body: JSON.stringify({
+      method,
+      urlPath,
+      response,
+      conditions: options?.conditions,
+      priority: options?.priority,
+      name: options?.name,
+    }),
   })
 }
 
-/** 删除 mock 规则 */
-export function removeMock(method: string, urlPath: string) {
-  return request<{ ok: boolean }>('/mocks', {
-    method: 'DELETE',
+/** 更新单条 mock 规则（按 id） */
+export function updateMock(id: string, patch: Partial<Omit<MockRule, 'id'>>) {
+  return request<{ ok: boolean }>(`/mocks/${id}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method, urlPath }),
+    body: JSON.stringify(patch),
+  })
+}
+
+/** 删除 mock 规则（按 id） */
+export function removeMock(id: string) {
+  return request<{ ok: boolean }>(`/mocks/${id}`, {
+    method: 'DELETE',
   })
 }
 

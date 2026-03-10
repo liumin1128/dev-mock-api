@@ -1,10 +1,7 @@
-import { useState, useMemo } from 'react'
-import { Input } from '@/components/ui/input'
 import { MethodBadge, StatusBadge, SourceBadge } from '@/components/badges'
 import { EmptyState } from '@/components/empty-state'
 import type { ProxyRecord } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { Search } from 'lucide-react'
 
 function formatTime(ts: string) {
   if (!ts) return '-'
@@ -27,43 +24,18 @@ export function RecordList({
   selectedTimestamp,
   onSelect,
 }: RecordListProps) {
-  const [search, setSearch] = useState('')
-
-  const filtered = useMemo(() => {
-    if (!search) return records
-    const q = search.toLowerCase()
-    return records.filter(
-      (r) =>
-        r.urlPath.toLowerCase().includes(q) ||
-        (r.targetHost && r.targetHost.toLowerCase().includes(q)),
-    )
-  }, [records, search])
-
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* 搜索栏 */}
-      <div className="border-b px-4 py-3">
-        <div className="relative">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="搜索 URL 路径或主机名..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-      </div>
-
       {/* 列表 */}
       <div className="flex-1 overflow-y-auto">
-        {filtered.length === 0 ? (
+        {records.length === 0 ? (
           <EmptyState
             icon="📡"
             title="暂无请求记录"
             description="开始使用代理后，所有经过的请求都会显示在这里"
           />
         ) : (
-          filtered.map((record, i) => (
+          records.map((record, i) => (
             <RecordRow
               key={`${record.timestamp}-${i}`}
               record={record}

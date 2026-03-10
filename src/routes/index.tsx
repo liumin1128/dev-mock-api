@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { toast } from 'sonner'
 
@@ -27,7 +27,15 @@ import {
 } from '@/lib/api'
 import type { MockSaveParams } from '@/components/mock-editor-dialog'
 
-import { Radio, ShieldCheck, Plus, Trash2, RefreshCw } from 'lucide-react'
+import {
+  Radio,
+  ShieldCheck,
+  Plus,
+  Trash2,
+  RefreshCw,
+  Search,
+} from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 export const Route = createFileRoute('/')({ component: App })
@@ -35,6 +43,9 @@ export const Route = createFileRoute('/')({ component: App })
 function App() {
   const { records, refresh: refreshRecords } = useRecords()
   const { mocks, refresh: refreshMocks } = useMocks()
+
+  // 搜索过滤
+  const [search, setSearch] = useState('')
 
   // 详情面板（快照：打开时冻结记录，不随轮询变化）
   const [selectedRecord, setSelectedRecord] = useState<ProxyRecord | null>(null)
@@ -45,6 +56,16 @@ function App() {
   const [editorData, setEditorData] = useState<MockEditorData | null>(null)
 
   // ---- 事件处理 ----
+
+  const filteredRecords = useMemo(() => {
+    if (!search) return records
+    const q = search.toLowerCase()
+    return records.filter(
+      (r) =>
+        r.urlPath.toLowerCase().includes(q) ||
+        (r.targetHost && r.targetHost.toLowerCase().includes(q)),
+    )
+  }, [records, search])
 
   const handleSelectRecord = useCallback((record: ProxyRecord) => {
     setSelectedRecord(record)
@@ -244,17 +265,6 @@ function App() {
           </TabsList>
 
           <div className="flex gap-2">
-            <TabsContent value="records" className="m-0 p-0">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                onClick={handleClearRecords}
-              >
-                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                清空记录
-              </Button>
-            </TabsContent>
             <TabsContent value="mocks" className="m-0 p-0">
               <Button size="sm" onClick={handleAddMock}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -271,8 +281,29 @@ function App() {
           value="records"
           className="m-0 flex flex-1 flex-col overflow-hidden"
         >
+          {/* 工具栏：搜索 + 清空 */}
+          <div className="flex items-center gap-2 border-b px-4 py-3">
+            <div className="relative flex-1">
+              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="搜索 URL 路径或主机名..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 text-destructive hover:text-destructive"
+              onClick={handleClearRecords}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              清空记录
+            </Button>
+          </div>
           <RecordList
-            records={records}
+            records={filteredRecords}
             selectedTimestamp={selectedRecord?.timestamp ?? null}
             onSelect={handleSelectRecord}
           />

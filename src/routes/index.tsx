@@ -206,75 +206,74 @@ function App() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* ===== 顶栏 ===== */}
-      <header className="flex shrink-0 items-center justify-between border-b px-5 py-3">
-        <div className="flex items-center gap-3">
-          <Radio className="h-5 w-5 text-primary" />
-          <h1 className="text-base font-semibold tracking-tight">
-            Dev Mock API
-          </h1>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-            自动刷新
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="outline" size="sm" asChild>
-            <a href={getCACertUrl()} download>
-              <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
-              CA 证书
-            </a>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => refreshRecords()}>
-            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-            刷新
-          </Button>
-        </div>
-      </header>
-
       {/* ===== 主体内容 (Tabs) ===== */}
       <Tabs
         defaultValue="records"
         className="flex flex-1 flex-col overflow-hidden"
       >
-        <div className="flex items-center justify-between border-b px-5">
-          <TabsList className="h-10 rounded-none border-0 bg-transparent p-0">
+        {/* ===== 顶栏：Logo + Nav + 工具按钮 ===== */}
+        <header className="flex shrink-0 items-center border-b px-5 py-2.5">
+          <div className="flex items-center gap-3 pr-6">
+            <Radio className="h-6 w-6 text-primary" />
+            <h1 className="text-lg font-semibold tracking-tight">
+              Dev Mock API
+            </h1>
+          </div>
+
+          <TabsList className="h-auto gap-1 rounded-lg bg-muted/60 p-1">
             <TabsTrigger
               value="records"
-              className="relative h-10 rounded-none border-b-2 border-transparent px-4 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="rounded-md px-4 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               📋 请求记录
               {records.length > 0 && (
-                <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
+                <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
                   {records.length}
                 </span>
               )}
             </TabsTrigger>
             <TabsTrigger
               value="mocks"
-              className="relative h-10 rounded-none border-b-2 border-transparent px-4 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              className="rounded-md px-4 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               📌 Mock 规则
               {mocks.length > 0 && (
-                <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium">
+                <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
                   {mocks.length}
                 </span>
               )}
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex gap-2">
+          <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+              自动刷新
+            </div>
+            <Separator orientation="vertical" className="mx-1 h-5" />
             <TabsContent value="mocks" className="m-0 p-0">
               <Button size="sm" onClick={handleAddMock}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
                 新增 Mock
               </Button>
             </TabsContent>
+            <ThemeToggle />
+            <Button variant="outline" size="sm" asChild>
+              <a href={getCACertUrl()} download>
+                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+                CA 证书
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refreshRecords()}
+            >
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              刷新
+            </Button>
           </div>
-        </div>
-
-        <Separator className="m-0" />
+        </header>
 
         {/* 请求记录面板 */}
         <TabsContent

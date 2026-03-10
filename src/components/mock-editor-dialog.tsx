@@ -26,8 +26,6 @@ export interface MockEditorData {
   urlPath: string
   response: string
   matchBody?: Record<string, unknown>
-  priority?: number
-  name?: string
 }
 
 export interface MockSaveParams {
@@ -36,8 +34,6 @@ export interface MockSaveParams {
   urlPath: string
   response: string
   matchBody?: Record<string, unknown>
-  priority: number
-  name?: string
 }
 
 interface MockEditorDialogProps {
@@ -63,8 +59,6 @@ export function MockEditorDialog({
 }: MockEditorDialogProps) {
   const [method, setMethod] = useState('GET')
   const [urlPath, setUrlPath] = useState('')
-  const [name, setName] = useState('')
-  const [priority, setPriority] = useState(0)
   const [response, setResponse] = useState(DEFAULT_RESPONSE)
   const [jsonError, setJsonError] = useState<string | null>(null)
 
@@ -75,8 +69,6 @@ export function MockEditorDialog({
     if (data) {
       setMethod(data.method)
       setUrlPath(data.urlPath)
-      setName(data.name ?? '')
-      setPriority(data.priority ?? 0)
       setResponse(data.response)
       setJsonError(null)
       const mb = data.matchBody
@@ -142,8 +134,6 @@ export function MockEditorDialog({
       urlPath: urlPath.trim(),
       response,
       matchBody: buildMatchBody(),
-      priority,
-      name: name.trim() || undefined,
     })
     onOpenChange(false)
   }
@@ -189,28 +179,6 @@ export function MockEditorDialog({
                 value={urlPath}
                 onChange={(e) => setUrlPath(e.target.value)}
                 className="font-mono text-sm"
-              />
-            </div>
-          </div>
-
-          {/* 名称 & 优先级 */}
-          <div className="grid grid-cols-[1fr_6rem] gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">规则名称（可选）</Label>
-              <Input
-                placeholder="便于区分同一路径下的多条规则"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="text-sm"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">优先级</Label>
-              <Input
-                type="number"
-                value={priority}
-                onChange={(e) => setPriority(Number(e.target.value))}
-                className="text-sm"
               />
             </div>
           </div>

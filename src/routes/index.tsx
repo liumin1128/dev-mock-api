@@ -119,8 +119,6 @@ function App() {
         urlPath: record.urlPath,
         response: JSON.stringify(response, null, 2),
         matchBody: existing?.matchBody,
-        priority: existing?.priority,
-        name: existing?.name,
       })
       setEditorOpen(true)
     },
@@ -135,8 +133,6 @@ function App() {
       urlPath: rule.urlPath,
       response: JSON.stringify(rule.response, null, 2),
       matchBody: rule.matchBody,
-      priority: rule.priority,
-      name: rule.name,
     })
     setEditorOpen(true)
   }, [])
@@ -175,14 +171,10 @@ function App() {
           urlPath: params.urlPath,
           response: parsed as import('@/lib/api').MockResponse,
           matchBody: params.matchBody,
-          priority: params.priority,
-          name: params.name,
         })
       } else {
         await setMock(params.method, params.urlPath, parsed, {
           matchBody: params.matchBody,
-          priority: params.priority,
-          name: params.name,
         })
       }
       refreshMocks()

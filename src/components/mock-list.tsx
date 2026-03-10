@@ -11,25 +11,18 @@ interface MockListProps {
   onRemove: (id: string) => void
 }
 
-/** 生成 matchBody 摘要 badge 列表 */
-function MatchBodyBadges({ rule }: { rule: MockRule }) {
+/** matchBody 摘要（作为 subtitle 显示） */
+function MatchBodySubtitle({ rule }: { rule: MockRule }) {
   const mb = rule.matchBody
   if (!mb || Object.keys(mb).length === 0) return null
-  const parts = Object.entries(mb).map(
-    ([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : String(v)}`,
-  )
+  const text = JSON.stringify(mb)
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
-      {parts.map((p) => (
-        <Badge
-          key={p}
-          variant="outline"
-          className="border-blue-500/30 bg-blue-500/10 font-mono text-[10px] text-blue-600 dark:text-blue-400"
-        >
-          {p}
-        </Badge>
-      ))}
-    </div>
+    <p
+      className="mt-0.5 truncate font-mono text-xs text-muted-foreground"
+      title={text}
+    >
+      {text}
+    </p>
   )
 }
 
@@ -72,21 +65,8 @@ export function MockList({ mocks, onEdit, onRemove }: MockListProps) {
                   ✏️ Custom
                 </Badge>
               )}
-              {rule.priority > 0 && (
-                <Badge
-                  variant="outline"
-                  className="shrink-0 border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-600 dark:text-emerald-400"
-                >
-                  P{rule.priority}
-                </Badge>
-              )}
             </div>
-            {rule.name && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {rule.name}
-              </p>
-            )}
-            <MatchBodyBadges rule={rule} />
+            <MatchBodySubtitle rule={rule} />
           </div>
           <span className="pt-0.5 text-xs text-muted-foreground">
             {new Date(rule.updatedAt).toLocaleString('zh-CN', {

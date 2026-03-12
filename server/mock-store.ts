@@ -212,13 +212,24 @@ class MockStore {
     for (const rule of this.mocks) {
       if (rule.method.toUpperCase() !== method.toUpperCase()) continue
       if (!matchUrl(rule.urlPath, urlPath, targetHost)) continue
-      // matchBody 子集匹配
+      // body 匹配：有 body 请求匹配含 matchBody 的规则；无 body 请求只匹配无 matchBody 的规则
       const mb = rule.matchBody
-      if (mb && Object.keys(mb).length > 0) {
+      const hasReqBody =
+        reqBody !== null && reqBody !== undefined && reqBody !== ''
+      const hasRuleBody = mb && Object.keys(mb).length > 0
+      if (hasReqBody && hasRuleBody) {
         if (!isBodySubset(mb, reqBody)) continue
         candidates.push({ rule, score: Object.keys(mb).length })
-      } else {
+      } else if (!hasReqBody && !hasRuleBody) {
         candidates.push({ rule, score: 0 })
+      } else {
+        // 有 body 请求 + 无 matchBody 规则 → 也匹配（兜底）
+        // 无 body 请求 + 有 matchBody 规则 → 跳过
+        if (hasReqBody && !hasRuleBody) {
+          candidates.push({ rule, score: 0 })
+        } else {
+          continue
+        }
       }
     }
     if (candidates.length === 0) return null

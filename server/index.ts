@@ -245,8 +245,10 @@ function proxyRequest(
 
   // 若请求体已被收集（用于 mock 匹配），用缓存的原始 Buffer 回放；否则直接 pipe
   const extReq = req as ExtRequest
-  if (extReq._rawBodyBuffer && extReq._rawBodyBuffer.length > 0) {
-    proxyReq.write(extReq._rawBodyBuffer)
+  if (extReq._bodyCollected) {
+    if (extReq._rawBodyBuffer && extReq._rawBodyBuffer.length > 0) {
+      proxyReq.write(extReq._rawBodyBuffer)
+    }
     proxyReq.end()
   } else {
     req.pipe(proxyReq)

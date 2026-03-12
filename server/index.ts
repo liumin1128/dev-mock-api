@@ -39,7 +39,7 @@ app.use((req: Request, res: Response) => {
 
   // 先收集请求体，再进行匹配
   collectRequestBody(req, (reqBody) => {
-    const mock = store.findMatchingRule(method, urlPath, reqBody)
+    const mock = store.findMatchingRule(method, urlPath, targetHost, reqBody)
     if (mock) {
       serveMock(req, res, method, urlPath, targetHost, mock.response, reqBody)
       return

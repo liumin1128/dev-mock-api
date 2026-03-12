@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -156,8 +157,8 @@ export function MockEditorDialog({
 
         <div className="min-w-0 space-y-4 py-2">
           {/* Method & URL */}
-          <div className="grid grid-cols-[6.25rem_1fr] gap-3">
-            <div className="space-y-1.5">
+          <div className="space-y-3">
+            <div className="w-[6.25rem] space-y-1.5">
               <Label className="text-xs">Method</Label>
               <Select value={method} onValueChange={setMethod}>
                 <SelectTrigger>
@@ -172,13 +173,16 @@ export function MockEditorDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">URL Path（精确匹配，含 query）</Label>
-              <Input
-                placeholder="/api/example 或 /api/example?page=1"
+            <div className="min-w-0 space-y-1.5">
+              <Label className="text-xs">
+                URL（完整地址，域名 + 路径 + query）
+              </Label>
+              <Textarea
+                placeholder="https://api.example.com/api/path?page=1"
                 value={urlPath}
                 onChange={(e) => setUrlPath(e.target.value)}
-                className="font-mono text-sm"
+                className="min-h-18 resize-y break-all font-mono text-sm"
+                rows={3}
               />
             </div>
           </div>

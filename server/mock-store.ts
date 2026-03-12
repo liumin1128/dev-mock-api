@@ -67,6 +67,25 @@ function normalizeUrl(urlPath: string): string {
   return qs ? `${pathPart}?${qs}` : pathPart
 }
 
+/** 匹配规则 URL：支持完整 URL（含域名）和仅路径两种格式 */
+function matchUrl(
+  ruleUrl: string,
+  requestPath: string,
+  requestHost: string,
+): boolean {
+  if (ruleUrl.startsWith('http://') || ruleUrl.startsWith('https://')) {
+    try {
+      const parsed = new URL(ruleUrl)
+      if (parsed.hostname !== requestHost) return false
+      const rulePath = parsed.pathname + parsed.search
+      return normalizeUrl(rulePath) === normalizeUrl(requestPath)
+    } catch {
+      return false
+    }
+  }
+  return normalizeUrl(ruleUrl) === normalizeUrl(requestPath)
+}
+
 /** 判断 obj 是否包含 subset 的全部字段（递归深度比较） */
 function isBodySubset(subset: Record<string, unknown>, obj: unknown): boolean {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false
@@ -186,13 +205,13 @@ class MockStore {
   findMatchingRule(
     method: string,
     urlPath: string,
+    targetHost: string,
     reqBody: unknown,
   ): MockRule | null {
-    const normalizedUrl = normalizeUrl(urlPath)
     const candidates: Array<{ rule: MockRule; score: number }> = []
     for (const rule of this.mocks) {
       if (rule.method.toUpperCase() !== method.toUpperCase()) continue
-      if (normalizeUrl(rule.urlPath) !== normalizedUrl) continue
+      if (!matchUrl(rule.urlPath, urlPath, targetHost)) continue
       // matchBody 子集匹配
       const mb = rule.matchBody
       if (mb && Object.keys(mb).length > 0) {

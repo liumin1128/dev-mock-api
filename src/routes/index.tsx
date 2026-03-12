@@ -90,7 +90,7 @@ function App() {
           : undefined
       await pinMock(
         record.method,
-        record.urlPath,
+        `https://${record.targetHost}${record.urlPath}`,
         {
           statusCode: record.statusCode,
           headers: record.responseHeaders,
@@ -137,7 +137,8 @@ function App() {
         mode: 'edit',
         id: existing?.id,
         method: record.method,
-        urlPath: record.urlPath,
+        urlPath:
+          existing?.urlPath ?? `https://${record.targetHost}${record.urlPath}`,
         response: JSON.stringify(response, null, 2),
         matchBody: existing?.matchBody,
       })
@@ -281,7 +282,7 @@ function App() {
           className="m-0 flex flex-1 flex-col overflow-hidden"
         >
           {/* 工具栏：搜索 + 清空 */}
-          <div className="flex items-center gap-2 border-b px-4 py-3">
+          <div className="flex items-center gap-2 border-b px-4 py-1 pb-3">
             <div className="relative flex-1">
               <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input

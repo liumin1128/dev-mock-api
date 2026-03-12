@@ -55,23 +55,23 @@ app.use((req: Request, res: Response) => {
   }
   const { targetHost, targetPort, targetProtocol, urlPath } = target
 
-  // 1. 检查是否有 mock 规则
-  const mock = store.findMatchingRule(method, urlPath, null)
-  if (mock && mock.response) {
-    serveMock(req, res, method, urlPath, targetHost, mock.response)
-    return
-  }
-
-  // 2. 无 mock，转发到目标服务器
-  proxyRequest(
-    req,
-    res,
-    method,
-    urlPath,
-    targetHost,
-    targetPort,
-    targetProtocol,
-  )
+  // 先收集请求体，再进行匹配
+  collectRequestBody(req, (reqBody) => {
+    const mock = store.findMatchingRule(method, urlPath, targetHost, reqBody)
+    if (mock) {
+      serveMock(req, res, method, urlPath, targetHost, mock.response, reqBody)
+      return
+    }
+    proxyRequest(
+      req,
+      res,
+      method,
+      urlPath,
+      targetHost,
+      targetPort,
+      targetProtocol,
+    )
+  })
 })
 
 // ============ 代理辅助函数 ============
@@ -132,25 +132,24 @@ function serveMock(
   urlPath: string,
   targetHost: string,
   mockResponse: MockResponse,
+  reqBody: unknown,
 ) {
   const statusCode = (mockResponse.statusCode as number) || 200
   const headers = (mockResponse.headers as Record<string, string>) || {}
   const body =
     mockResponse.body !== undefined ? mockResponse.body : mockResponse
 
-  collectRequestBody(req, (reqBody) => {
-    store.addRecord({
-      method,
-      urlPath,
-      targetHost,
-      requestHeaders: filterHeaders(req.headers as Record<string, string>),
-      requestBody: reqBody,
-      statusCode,
-      responseHeaders: headers,
-      responseBody: body,
-      source: 'mock',
-      timestamp: new Date().toISOString(),
-    })
+  store.addRecord({
+    method,
+    urlPath,
+    targetHost,
+    requestHeaders: filterHeaders(req.headers as Record<string, string>),
+    requestBody: reqBody ?? null,
+    statusCode,
+    responseHeaders: headers,
+    responseBody: body,
+    source: 'mock',
+    timestamp: new Date().toISOString(),
   })
 
   const contentType =

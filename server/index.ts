@@ -52,6 +52,7 @@ app.use((req: Request, res: Response) => {
       targetHost,
       targetPort,
       targetProtocol,
+      reqBody,
     )
   })
 })
@@ -166,6 +167,7 @@ function proxyRequest(
   targetHost: string,
   targetPort: number,
   targetProtocol: string,
+  reqBody: unknown,
 ) {
   const isHttps = targetProtocol === 'https:'
   const requester = isHttps ? https : http
@@ -185,6 +187,7 @@ function proxyRequest(
     method,
     headers: proxyHeaders,
     rejectUnauthorized: false,
+    timeout: 30_000,
   }
 
   const proxyReq = requester.request(options, (proxyRes) => {
@@ -199,21 +202,19 @@ function proxyRequest(
         responseBody = responseBuffer.toString('utf-8')
       }
 
-      collectRequestBody(req, (reqBody) => {
-        store.addRecord({
-          method,
-          urlPath,
-          targetHost,
-          requestHeaders: filterHeaders(req.headers as Record<string, string>),
-          requestBody: reqBody,
-          statusCode: proxyRes.statusCode || 502,
-          responseHeaders: filterHeaders(
-            proxyRes.headers as Record<string, string>,
-          ),
-          responseBody,
-          source: 'proxy',
-          timestamp: new Date().toISOString(),
-        })
+      store.addRecord({
+        method,
+        urlPath,
+        targetHost,
+        requestHeaders: filterHeaders(req.headers as Record<string, string>),
+        requestBody: reqBody ?? null,
+        statusCode: proxyRes.statusCode || 502,
+        responseHeaders: filterHeaders(
+          proxyRes.headers as Record<string, string>,
+        ),
+        responseBody,
+        source: 'proxy',
+        timestamp: new Date().toISOString(),
       })
 
       const resHeaders = { ...proxyRes.headers } as Record<string, string>
@@ -225,6 +226,10 @@ function proxyRequest(
     })
   })
 
+  proxyReq.on('timeout', () => {
+    proxyReq.destroy(new Error('Proxy request timeout (30s)'))
+  })
+
   proxyReq.on('error', (err) => {
     const msg = '[Proxy Error] ' + method + ' ' + targetHost + urlPath
     console.error(msg, '->', err.message)
@@ -233,14 +238,16 @@ function proxyRequest(
       urlPath,
       targetHost,
       requestHeaders: filterHeaders(req.headers as Record<string, string>),
-      requestBody: null,
+      requestBody: reqBody ?? null,
       statusCode: 502,
       responseHeaders: {},
       responseBody: { error: err.message },
       source: 'proxy',
       timestamp: new Date().toISOString(),
     })
-    res.status(502).json({ error: 'Proxy Error', message: err.message })
+    if (!res.headersSent) {
+      res.status(502).json({ error: 'Proxy Error', message: err.message })
+    }
   })
 
   // 若请求体已被收集（用于 mock 匹配），用缓存的原始 Buffer 回放；否则直接 pipe
@@ -276,25 +283,39 @@ function collectRequestBody(
     callback(req.body)
     return
   }
+
+  let done = false
+  const finish = (body: unknown, rawBuffer?: Buffer) => {
+    if (done) return
+    done = true
+    if (rawBuffer) req._rawBodyBuffer = rawBuffer
+    req._bodyCollected = true
+    req._collectedBody = body
+    callback(body)
+  }
+
   const chunks: Buffer[] = []
   req.on('data', (chunk: Buffer) => chunks.push(chunk))
   req.on('end', () => {
     const rawBuffer = Buffer.concat(chunks)
-    req._rawBodyBuffer = rawBuffer
+    if (rawBuffer.length === 0) {
+      finish(null, rawBuffer)
+      return
+    }
     let body: unknown = rawBuffer.toString('utf-8')
     try {
       body = JSON.parse(body as string)
     } catch {
       /* keep as string */
     }
-    req._bodyCollected = true
-    req._collectedBody = body || null
-    callback(body || null)
+    finish(body, rawBuffer)
   })
+  req.on('error', () => {
+    finish(null)
+  })
+  // 流已结束时（如 Express 已消费），直接返回 null
   if (req.readable === false) {
-    req._bodyCollected = true
-    req._collectedBody = null
-    callback(null)
+    finish(null)
   }
 }
 
